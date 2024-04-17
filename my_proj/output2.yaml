@@ -95,7 +95,7 @@ Resources:
         - Key: aws-cdk:subnet-name
           Value: Private-Subnet
         - Key: aws-cdk:subnet-type
-          Value: Isolated
+          Value: Private
         - Key: Name
           Value: EcsFargateStack/MyVpc/Private-SubnetSubnet1
       VpcId:
@@ -121,6 +121,16 @@ Resources:
         Ref: MyVpcPrivateSubnetSubnet1SubnetA78B35C9
     Metadata:
       aws:cdk:path: EcsFargateStack/MyVpc/Private-SubnetSubnet1/RouteTableAssociation
+  MyVpcPrivateSubnetSubnet1DefaultRouteA7B6A683:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: MyVpcPublicSubnetSubnet1NATGateway0B60ACEA
+      RouteTableId:
+        Ref: MyVpcPrivateSubnetSubnet1RouteTable2EFF46AF
+    Metadata:
+      aws:cdk:path: EcsFargateStack/MyVpc/Private-SubnetSubnet1/DefaultRoute
   MyVpcIGW5C4A4F63:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -215,6 +225,33 @@ Resources:
       aws:cdk:path: EcsFargateStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler
       aws:asset:path: asset.ee7de53d64cc9d6248fa6aa550f92358f6c907b5efd6f3298aeab1b5e7ea358a
       aws:asset:property: Code
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+    Metadata:
+      aws:cdk:path: EcsFargateStack/EIP
+  MyNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - EIP
+          - AllocationId
+      SubnetId:
+        Ref: MyVpcPublicSubnetSubnet1Subnet9B31E6F9
+    Metadata:
+      aws:cdk:path: EcsFargateStack/MyNatGateway
+  DefaultRouteToNat:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: MyNatGateway
+      RouteTableId:
+        Ref: MyVpcPrivateSubnetSubnet1RouteTable2EFF46AF
+    Metadata:
+      aws:cdk:path: EcsFargateStack/DefaultRouteToNat
   MyECRRepositoryCB74C77A:
     Type: AWS::ECR::Repository
     UpdateReplacePolicy: Delete

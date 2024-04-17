@@ -24,6 +24,31 @@ class EcsFargateStack(core.Stack):
         # 创建 VPC 和子网
         self.vpc = self.create_VPC()
 
+        # 创建 NAT Gateway
+        nat_gateway = ec2.CfnNatGateway(
+            self, "MyNatGateway",
+            allocation_id=ec2.CfnEIP(self, "EIP", domain="vpc").attr_allocation_id,
+            subnet_id=self.vpc.select_subnets(subnet_type=ec2.SubnetType.PUBLIC).subnet_ids[0]
+        )
+
+        # 将私有子网的路由表设置为使用 NAT Gateway 作为默认路由
+        private_subnet = self.vpc.private_subnets[0]
+        route_table = private_subnet.route_table
+        # 创建默认路由
+        ec2.CfnRoute(
+            self, "DefaultRouteToNat",
+            route_table_id=route_table.route_table_id,
+            destination_cidr_block="0.0.0.0/0",
+            nat_gateway_id=nat_gateway.ref
+        )
+        # # 创建默认路由
+        # route_table.add_route(
+        #     "DefaultRouteToNat",
+        #     router_type=ec2.RouterType.NAT_GATEWAY,
+        #     router_id=nat_gateway.ref,
+        #     destination_cidr_block="0.0.0.0/0"
+        # )
+
         # 创建 ECR 存储库
         ecr_repository = ecr.Repository(
             self, "MyECRRepository",
@@ -68,7 +93,7 @@ class EcsFargateStack(core.Stack):
             task_definition=task_definition,
             desired_count=1,
             assign_public_ip=False,  # 不分配公有 IP，私有子网
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
         )
 
         # 添加 AutoScaling
@@ -121,7 +146,7 @@ class EcsFargateStack(core.Stack):
                 ),
                 ec2.SubnetConfiguration(
                     name = 'Private-Subnet',
-                    subnet_type = ec2.SubnetType.PRIVATE_ISOLATED,
+                    subnet_type = ec2.SubnetType.PRIVATE_WITH_EGRESS,
                     cidr_mask = SUBNET_SIZE,
                 ),
             ],
