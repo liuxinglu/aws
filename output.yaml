@@ -1,0 +1,391 @@
+Resources:
+  Vpc8378EB38:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.32.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Resource
+  VpcPublicSubnetSubnet1Subnet00728F83:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 172.32.0.0/26
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public-Subnet
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: MyProjStack/Vpc/Public-SubnetSubnet1
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet1/Subnet
+  VpcPublicSubnetSubnet1RouteTable1183C5A3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc/Public-SubnetSubnet1
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet1/RouteTable
+  VpcPublicSubnetSubnet1RouteTableAssociation261B1899:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: VpcPublicSubnetSubnet1RouteTable1183C5A3
+      SubnetId:
+        Ref: VpcPublicSubnetSubnet1Subnet00728F83
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet1/RouteTableAssociation
+  VpcPublicSubnetSubnet1DefaultRoute7F519B7C:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: VpcIGWD7BA715C
+      RouteTableId:
+        Ref: VpcPublicSubnetSubnet1RouteTable1183C5A3
+    DependsOn:
+      - VpcVPCGWBF912B6E
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet1/DefaultRoute
+  VpcPublicSubnetSubnet2Subnet3F05F9E6:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 172.32.0.64/26
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public-Subnet
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: MyProjStack/Vpc/Public-SubnetSubnet2
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet2/Subnet
+  VpcPublicSubnetSubnet2RouteTableDDC65D59:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc/Public-SubnetSubnet2
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet2/RouteTable
+  VpcPublicSubnetSubnet2RouteTableAssociationB9C92C92:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: VpcPublicSubnetSubnet2RouteTableDDC65D59
+      SubnetId:
+        Ref: VpcPublicSubnetSubnet2Subnet3F05F9E6
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet2/RouteTableAssociation
+  VpcPublicSubnetSubnet2DefaultRouteDEEAB16E:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: VpcIGWD7BA715C
+      RouteTableId:
+        Ref: VpcPublicSubnetSubnet2RouteTableDDC65D59
+    DependsOn:
+      - VpcVPCGWBF912B6E
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Public-SubnetSubnet2/DefaultRoute
+  VpcPrivateSubnetSubnet1SubnetCD1872FB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 172.32.0.128/26
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private-Subnet
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+        - Key: Name
+          Value: MyProjStack/Vpc/Private-SubnetSubnet1
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet1/Subnet
+  VpcPrivateSubnetSubnet1RouteTable46FF69AA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc/Private-SubnetSubnet1
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet1/RouteTable
+  VpcPrivateSubnetSubnet1RouteTableAssociation04E71104:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: VpcPrivateSubnetSubnet1RouteTable46FF69AA
+      SubnetId:
+        Ref: VpcPrivateSubnetSubnet1SubnetCD1872FB
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet1/RouteTableAssociation
+  VpcPrivateSubnetSubnet2SubnetDB5D304B:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 172.32.0.192/26
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private-Subnet
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+        - Key: Name
+          Value: MyProjStack/Vpc/Private-SubnetSubnet2
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet2/Subnet
+  VpcPrivateSubnetSubnet2RouteTable96C98A33:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc/Private-SubnetSubnet2
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet2/RouteTable
+  VpcPrivateSubnetSubnet2RouteTableAssociation1B48A5D9:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: VpcPrivateSubnetSubnet2RouteTable96C98A33
+      SubnetId:
+        Ref: VpcPrivateSubnetSubnet2SubnetDB5D304B
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/Private-SubnetSubnet2/RouteTableAssociation
+  VpcIGWD7BA715C:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyProjStack/Vpc
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/IGW
+  VpcVPCGWBF912B6E:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: VpcIGWD7BA715C
+      VpcId:
+        Ref: Vpc8378EB38
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/VPCGW
+  VpcRestrictDefaultSecurityGroupCustomResourceC73DA2BE:
+    Type: Custom::VpcRestrictDefaultSG
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E
+          - Arn
+      DefaultSecurityGroupId:
+        Fn::GetAtt:
+          - Vpc8378EB38
+          - DefaultSecurityGroup
+      Account:
+        Ref: AWS::AccountId
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: MyProjStack/Vpc/RestrictDefaultSecurityGroupCustomResource/Default
+  CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: Inline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:"
+                        - Ref: AWS::Partition
+                        - ":ec2:"
+                        - Ref: AWS::Region
+                        - ":"
+                        - Ref: AWS::AccountId
+                        - :security-group/
+                        - Fn::GetAtt:
+                            - Vpc8378EB38
+                            - DefaultSecurityGroup
+    Metadata:
+      aws:cdk:path: MyProjStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role
+  CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}
+        S3Key: ee7de53d64cc9d6248fa6aa550f92358f6c907b5efd6f3298aeab1b5e7ea358a.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: __entrypoint__.handler
+      Role:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
+          - Arn
+      Runtime: nodejs18.x
+      Description: Lambda function for removing all inbound/outbound rules from the VPC default security group
+    DependsOn:
+      - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
+    Metadata:
+      aws:cdk:path: MyProjStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler
+      aws:asset:path: asset.ee7de53d64cc9d6248fa6aa550f92358f6c907b5efd6f3298aeab1b5e7ea358a
+      aws:asset:property: Code
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/3WOQW/CMAyFfwv3NBsgMXEsPUy7RS3iitzUgKF1UOxQIcR/n6ohctrJ7322n72w8+XKfs5glMJ3l6Kn1j4aBX8xMMoe/cI+dldvqgPvXGVcanvyTWoZdWJZ1SEpbqHtMfPMSpHgCZQCv4eNi3QDxZzxw4qRUb9BcYT76+jLlargTwOyPk2NElL0aKokGoZsD/xPy8Vwow7jBgRNKYLaKByJj9NOFbij6bencXc9Bf5Y2rX9mp2FqIiJlQa09V/9BXVhgv4xAQAA
+    Metadata:
+      aws:cdk:path: MyProjStack/CDKMetadata/Default
+    Condition: CDKMetadataAvailable
+Conditions:
+  CDKMetadataAvailable:
+    Fn::Or:
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - af-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-east-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-northeast-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-northeast-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-southeast-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-southeast-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ca-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - cn-north-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - cn-northwest-1
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-north-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-3
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - il-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - me-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - me-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - sa-east-1
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-east-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-east-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-west-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-west-2
+Parameters:
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+Rules:
+  CheckBootstrapVersion:
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Contains:
+                - - "1"
+                  - "2"
+                  - "3"
+                  - "4"
+                  - "5"
+                - Ref: BootstrapVersion
+        AssertDescription: CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.
+
