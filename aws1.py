@@ -218,40 +218,19 @@ class EC2Ops():
         # 在每个实例上启动 httpd 服务
         for ip in ips:
             ssh = self.ssh_connect(ip, ssh_username, ssh_key_path)
-            stdin, stdout, stderr = ssh.exec_command('sudo yum install -y httpd', timeout=10)
-            error = stderr.read().decode('utf-8')
-            if error:
-                print("Error install httpd:", error)
-                return
-            # 等待安装完成
-            time.sleep(10)
-            stdin, stdout, stderr = ssh.exec_command('sudo systemctl start httpd')
-            error = stderr.read().decode('utf-8')
-            if error:
-                print("Error start httpd:", error)
-                return
-            else:
-                print(f"Started httpd on {ip}")
-            # 要写入文件的内容
             file_content = "hello\n"
-            cmd_create_file = 'sudo touch /var/www/html/index.html'
-            cmd_write_content = f"echo '{file_content}' | sudo tee /var/www/html/index.html"
-            stdin, stdout, stderr = ssh.exec_command(cmd_create_file)
-            error = stderr.read().decode('utf-8')
-            if error:
-                print("Error creating file:", error)
-
-            stdin, stdout, stderr = ssh.exec_command(cmd_write_content)
-            error = stderr.read().decode('utf-8')
-
-            if error:
-                print("Error writing content to file:", error)
-
-            else:
-                print("File created and content written successfully.")
-            stdin, stdout, stderr = ssh.exec_command('sudo systemctl restart httpd')
-            stdin, stdout, stderr = ssh.exec_command('sudo systemctl enable httpd')
-
+            cmd_lst = ['sudo yum install -y httpd',
+                       'sudo systemctl start httpd',
+                       'sudo touch /var/www/html/index.html',
+                       f"echo '{file_content}' | sudo tee /var/www/html/index.html",
+                       'sudo systemctl restart httpd',
+                       'sudo systemctl enable httpd']
+            for i in range(len(cmd_lst)):
+                stdin, stdout, stderr = ssh.exec_command(cmd_lst[i], timeout=10)
+                error = stderr.read().decode('utf-8')
+                if error:
+                    print(i, "Error :", error)
+                    return
             ssh.close()
 
 
