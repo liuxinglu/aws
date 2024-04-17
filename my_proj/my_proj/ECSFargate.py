@@ -11,17 +11,18 @@ from aws_cdk import (
 import aws_cdk as core
 from constructs import Construct
 
+VPC_CIDR = "172.32.0.0/16"
+SUBNET_SIZE = 26
+SUBNET_CIDRS = ['172.32.1.0/24', '172.32.2.0/24']
+AV_ZONES = ['ap-southeast-2a', 'ap-southeast-2b']
+
 class EcsFargateStack(core.Stack):
 
     def __init__(self, scope: Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # 创建 VPC 和子网
-        self.vpc = ec2.Vpc(
-            self, "MyVpc",
-            max_azs=2,
-            nat_gateways=1
-        )
+        self.vpc = self.create_VPC()
 
         # 创建 ECR 存储库
         ecr_repository = ecr.Repository(
@@ -64,7 +65,10 @@ class EcsFargateStack(core.Stack):
         service = ecs.FargateService(
             self, "MyFargateService",
             cluster=cluster,
-            task_definition=task_definition
+            task_definition=task_definition,
+            desired_count=1,
+            assign_public_ip=False,  # 不分配公有 IP，私有子网
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
         )
 
         # 添加 AutoScaling
@@ -103,3 +107,25 @@ class EcsFargateStack(core.Stack):
         )
 
 
+    def create_VPC(self):
+        vpc = ec2.Vpc(
+            self,
+            "MyVpc",
+            ip_addresses = ec2.IpAddresses.cidr(VPC_CIDR),
+            subnet_configuration = [
+                ec2.SubnetConfiguration(
+                    name = 'Public-Subnet',
+                    subnet_type = ec2.SubnetType.PUBLIC,
+                    cidr_mask = SUBNET_SIZE,
+
+                ),
+                ec2.SubnetConfiguration(
+                    name = 'Private-Subnet',
+                    subnet_type = ec2.SubnetType.PRIVATE_ISOLATED,
+                    cidr_mask = SUBNET_SIZE,
+                ),
+            ],
+            availability_zones = [AV_ZONES[0]],
+            nat_gateways=1
+        )
+        return vpc

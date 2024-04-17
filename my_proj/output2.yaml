@@ -2,7 +2,7 @@ Resources:
   MyVpcF9F0CA6F:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
+      CidrBlock: 172.32.0.0/16
       EnableDnsHostnames: true
       EnableDnsSupport: true
       InstanceTenancy: default
@@ -11,232 +11,116 @@ Resources:
           Value: EcsFargateStack/MyVpc
     Metadata:
       aws:cdk:path: EcsFargateStack/MyVpc/Resource
-  MyVpcPublicSubnet1SubnetF6608456:
+  MyVpcPublicSubnetSubnet1Subnet9B31E6F9:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - Fn::GetAZs: ""
-      CidrBlock: 10.0.0.0/18
+      AvailabilityZone: ap-southeast-2a
+      CidrBlock: 172.32.0.0/26
       MapPublicIpOnLaunch: true
       Tags:
         - Key: aws-cdk:subnet-name
-          Value: Public
+          Value: Public-Subnet
         - Key: aws-cdk:subnet-type
           Value: Public
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet1
+          Value: EcsFargateStack/MyVpc/Public-SubnetSubnet1
       VpcId:
         Ref: MyVpcF9F0CA6F
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/Subnet
-  MyVpcPublicSubnet1RouteTableC46AB2F4:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/Subnet
+  MyVpcPublicSubnetSubnet1RouteTableE6AB77CE:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet1
+          Value: EcsFargateStack/MyVpc/Public-SubnetSubnet1
       VpcId:
         Ref: MyVpcF9F0CA6F
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/RouteTable
-  MyVpcPublicSubnet1RouteTableAssociation2ECEE1CB:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/RouteTable
+  MyVpcPublicSubnetSubnet1RouteTableAssociation270EA6F0:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: MyVpcPublicSubnet1RouteTableC46AB2F4
+        Ref: MyVpcPublicSubnetSubnet1RouteTableE6AB77CE
       SubnetId:
-        Ref: MyVpcPublicSubnet1SubnetF6608456
+        Ref: MyVpcPublicSubnetSubnet1Subnet9B31E6F9
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/RouteTableAssociation
-  MyVpcPublicSubnet1DefaultRoute95FDF9EB:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/RouteTableAssociation
+  MyVpcPublicSubnetSubnet1DefaultRouteFE0ED8E0:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
         Ref: MyVpcIGW5C4A4F63
       RouteTableId:
-        Ref: MyVpcPublicSubnet1RouteTableC46AB2F4
+        Ref: MyVpcPublicSubnetSubnet1RouteTableE6AB77CE
     DependsOn:
       - MyVpcVPCGW488ACE0D
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/DefaultRoute
-  MyVpcPublicSubnet1EIP096967CB:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/DefaultRoute
+  MyVpcPublicSubnetSubnet1EIP684AFACB:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
       Tags:
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet1
+          Value: EcsFargateStack/MyVpc/Public-SubnetSubnet1
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/EIP
-  MyVpcPublicSubnet1NATGatewayAD3400C1:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/EIP
+  MyVpcPublicSubnetSubnet1NATGateway0B60ACEA:
     Type: AWS::EC2::NatGateway
     Properties:
       AllocationId:
         Fn::GetAtt:
-          - MyVpcPublicSubnet1EIP096967CB
+          - MyVpcPublicSubnetSubnet1EIP684AFACB
           - AllocationId
       SubnetId:
-        Ref: MyVpcPublicSubnet1SubnetF6608456
+        Ref: MyVpcPublicSubnetSubnet1Subnet9B31E6F9
       Tags:
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet1
+          Value: EcsFargateStack/MyVpc/Public-SubnetSubnet1
     DependsOn:
-      - MyVpcPublicSubnet1DefaultRoute95FDF9EB
-      - MyVpcPublicSubnet1RouteTableAssociation2ECEE1CB
+      - MyVpcPublicSubnetSubnet1DefaultRouteFE0ED8E0
+      - MyVpcPublicSubnetSubnet1RouteTableAssociation270EA6F0
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet1/NATGateway
-  MyVpcPublicSubnet2Subnet492B6BFB:
+      aws:cdk:path: EcsFargateStack/MyVpc/Public-SubnetSubnet1/NATGateway
+  MyVpcPrivateSubnetSubnet1SubnetA78B35C9:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - Fn::GetAZs: ""
-      CidrBlock: 10.0.64.0/18
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: aws-cdk:subnet-name
-          Value: Public
-        - Key: aws-cdk:subnet-type
-          Value: Public
-        - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet2
-      VpcId:
-        Ref: MyVpcF9F0CA6F
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet2/Subnet
-  MyVpcPublicSubnet2RouteTable1DF17386:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      Tags:
-        - Key: Name
-          Value: EcsFargateStack/MyVpc/PublicSubnet2
-      VpcId:
-        Ref: MyVpcF9F0CA6F
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet2/RouteTable
-  MyVpcPublicSubnet2RouteTableAssociation227DE78D:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId:
-        Ref: MyVpcPublicSubnet2RouteTable1DF17386
-      SubnetId:
-        Ref: MyVpcPublicSubnet2Subnet492B6BFB
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet2/RouteTableAssociation
-  MyVpcPublicSubnet2DefaultRoute052936F6:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId:
-        Ref: MyVpcIGW5C4A4F63
-      RouteTableId:
-        Ref: MyVpcPublicSubnet2RouteTable1DF17386
-    DependsOn:
-      - MyVpcVPCGW488ACE0D
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PublicSubnet2/DefaultRoute
-  MyVpcPrivateSubnet1Subnet5057CF7E:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - Fn::GetAZs: ""
-      CidrBlock: 10.0.128.0/18
+      AvailabilityZone: ap-southeast-2a
+      CidrBlock: 172.32.0.64/26
       MapPublicIpOnLaunch: false
       Tags:
         - Key: aws-cdk:subnet-name
-          Value: Private
+          Value: Private-Subnet
         - Key: aws-cdk:subnet-type
-          Value: Private
+          Value: Isolated
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PrivateSubnet1
+          Value: EcsFargateStack/MyVpc/Private-SubnetSubnet1
       VpcId:
         Ref: MyVpcF9F0CA6F
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet1/Subnet
-  MyVpcPrivateSubnet1RouteTable8819E6E2:
+      aws:cdk:path: EcsFargateStack/MyVpc/Private-SubnetSubnet1/Subnet
+  MyVpcPrivateSubnetSubnet1RouteTable2EFF46AF:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
-          Value: EcsFargateStack/MyVpc/PrivateSubnet1
+          Value: EcsFargateStack/MyVpc/Private-SubnetSubnet1
       VpcId:
         Ref: MyVpcF9F0CA6F
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet1/RouteTable
-  MyVpcPrivateSubnet1RouteTableAssociation56D38C7E:
+      aws:cdk:path: EcsFargateStack/MyVpc/Private-SubnetSubnet1/RouteTable
+  MyVpcPrivateSubnetSubnet1RouteTableAssociation3FCA51EE:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: MyVpcPrivateSubnet1RouteTable8819E6E2
+        Ref: MyVpcPrivateSubnetSubnet1RouteTable2EFF46AF
       SubnetId:
-        Ref: MyVpcPrivateSubnet1Subnet5057CF7E
+        Ref: MyVpcPrivateSubnetSubnet1SubnetA78B35C9
     Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet1/RouteTableAssociation
-  MyVpcPrivateSubnet1DefaultRouteA8CDE2FA:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId:
-        Ref: MyVpcPublicSubnet1NATGatewayAD3400C1
-      RouteTableId:
-        Ref: MyVpcPrivateSubnet1RouteTable8819E6E2
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet1/DefaultRoute
-  MyVpcPrivateSubnet2Subnet0040C983:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - Fn::GetAZs: ""
-      CidrBlock: 10.0.192.0/18
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: aws-cdk:subnet-name
-          Value: Private
-        - Key: aws-cdk:subnet-type
-          Value: Private
-        - Key: Name
-          Value: EcsFargateStack/MyVpc/PrivateSubnet2
-      VpcId:
-        Ref: MyVpcF9F0CA6F
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet2/Subnet
-  MyVpcPrivateSubnet2RouteTableCEDCEECE:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      Tags:
-        - Key: Name
-          Value: EcsFargateStack/MyVpc/PrivateSubnet2
-      VpcId:
-        Ref: MyVpcF9F0CA6F
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet2/RouteTable
-  MyVpcPrivateSubnet2RouteTableAssociation86A610DA:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId:
-        Ref: MyVpcPrivateSubnet2RouteTableCEDCEECE
-      SubnetId:
-        Ref: MyVpcPrivateSubnet2Subnet0040C983
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet2/RouteTableAssociation
-  MyVpcPrivateSubnet2DefaultRoute9CE96294:
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId:
-        Ref: MyVpcPublicSubnet1NATGatewayAD3400C1
-      RouteTableId:
-        Ref: MyVpcPrivateSubnet2RouteTableCEDCEECE
-    Metadata:
-      aws:cdk:path: EcsFargateStack/MyVpc/PrivateSubnet2/DefaultRoute
+      aws:cdk:path: EcsFargateStack/MyVpc/Private-SubnetSubnet1/RouteTableAssociation
   MyVpcIGW5C4A4F63:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -475,6 +359,7 @@ Resources:
           Rollback: false
         MaximumPercent: 200
         MinimumHealthyPercent: 50
+      DesiredCount: 1
       EnableECSManagedTags: false
       HealthCheckGracePeriodSeconds: 60
       LaunchType: FARGATE
@@ -491,8 +376,7 @@ Resources:
                 - MyFargateServiceSecurityGroup0E9E24D5
                 - GroupId
           Subnets:
-            - Ref: MyVpcPrivateSubnet1Subnet5057CF7E
-            - Ref: MyVpcPrivateSubnet2Subnet0040C983
+            - Ref: MyVpcPrivateSubnetSubnet1SubnetA78B35C9
       TaskDefinition:
         Ref: MyTaskDefinitionF5B350B4
     DependsOn:
@@ -573,14 +457,11 @@ Resources:
             - MyALBSecurityGroupF26FC01F
             - GroupId
       Subnets:
-        - Ref: MyVpcPublicSubnet1SubnetF6608456
-        - Ref: MyVpcPublicSubnet2Subnet492B6BFB
+        - Ref: MyVpcPublicSubnetSubnet1Subnet9B31E6F9
       Type: application
     DependsOn:
-      - MyVpcPublicSubnet1DefaultRoute95FDF9EB
-      - MyVpcPublicSubnet1RouteTableAssociation2ECEE1CB
-      - MyVpcPublicSubnet2DefaultRoute052936F6
-      - MyVpcPublicSubnet2RouteTableAssociation227DE78D
+      - MyVpcPublicSubnetSubnet1DefaultRouteFE0ED8E0
+      - MyVpcPublicSubnetSubnet1RouteTableAssociation270EA6F0
     Metadata:
       aws:cdk:path: EcsFargateStack/MyALB/Resource
   MyALBSecurityGroupF26FC01F:
