@@ -8,7 +8,9 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_events as events,
     aws_events_targets as targets,
-    aws_iam as iam
+    aws_iam as iam,
+    aws_secretsmanager as secretsmanager,
+    aws_rds as rds
 )
 import aws_cdk as core
 from constructs import Construct
@@ -96,7 +98,8 @@ class EcsFargateStack(core.Stack):
             default_target_groups=[target_group]
         )
 
-        self.dataOps()
+        self.s3_data_ops()
+        self.aurora_data_ops()
 
         # 输出 ALB DNS 名称
         output = core.CfnOutput(
@@ -110,17 +113,21 @@ class EcsFargateStack(core.Stack):
             self,
             "MyVpc",
             ip_addresses = ec2.IpAddresses.cidr(VPC_CIDR),
-            subnet_configuration = [
+            subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name = 'Public-Subnet',
-                    subnet_type = ec2.SubnetType.PUBLIC,
-                    cidr_mask = SUBNET_SIZE,
-
+                    name="Public-Subnet",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                    cidr_mask=SUBNET_SIZE,
                 ),
                 ec2.SubnetConfiguration(
-                    name = 'Private-Subnet',
-                    subnet_type = ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    cidr_mask = SUBNET_SIZE,
+                    name="Private-Subnet-1",
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=SUBNET_SIZE,
+                ),
+                ec2.SubnetConfiguration(
+                    name="Private-Subnet-2",
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=SUBNET_SIZE,
                 ),
             ],
             availability_zones = [AV_ZONES[0]],
@@ -157,46 +164,134 @@ class EcsFargateStack(core.Stack):
         sg.add_egress_rule(peer=ec2.Peer.ipv4("0.0.0.0/0"), connection=ec2.Port.tcp(443), description="HTTPS egress")
         return sg
 
-    def create_lambda(self):
+    def create_s3_lambda(self):
         # 创建 Lambda 函数
-        lambda_fn = _lambda.Function(
-            self, "MyLambdaFunction",
+        s3_lambda = _lambda.Function(
+            self, "MyS3LambdaFunction",
             runtime=_lambda.Runtime.PYTHON_3_8,
             handler="lambda_function.handler",
-            code=_lambda.Code.from_asset("d://Documents/pythonProject/aws/my_proj/lambda_fun/lambda_s3.py"),  # 指定 Lambda 函数代码路径
+            code=_lambda.Code.from_asset("D://Documents/pythonProject/aws/my_proj/lambda_fun/fun_s3/"),  # 指定 Lambda 函数代码路径
             environment={
-                'BUCKET_NAME': 'mybucket-cdk'  # 设置环境变量，替换为您的 S3 存储桶名称
+                'BUCKET_NAME': 'mybucket-cdk'
             }
         )
 
         # 添加 Lambda 执行角色权限
-        lambda_fn.add_to_role_policy(
+        s3_lambda.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["s3:PutObject"],
-                resources=["arn:aws:s3:::mybucket-cdk/*"]  # 替换为您的 S3 存储桶 ARN
+                resources=["arn:aws:s3:::mybucket-cdk/*"]  # S3 存储桶 ARN
             )
         )
 
-        return lambda_fn
+        return s3_lambda
 
-    def dataOps(self):
+    def create_aurora_writer_lambda(self, cluster):
+
+        # 从 Secrets Manager 中获取 Aurora 数据库的登录信息
+        db_secret = secretsmanager.Secret.from_secret_name_v2(
+            self, "MyDBSecret",
+            secret_name="my-db-secret"
+        )
+
+        # 数据库表
+        database_name = "my_database"
+
+        # database_credentials = secretsmanager.Secret(
+        #     self, "DatabaseCredentials",
+        #     generate_secret_string=secretsmanager.SecretStringGenerator(
+        #         secret_string_template='{"username": "admin"}',
+        #         generate_string_key='password',
+        #         exclude_punctuation=True
+        #     )
+        # )
+
+        # database_credentials.grant_read_write(cluster.secret.secret_arn)
+
+        # 创建 Lambda 函数
+        aurora_lambda = _lambda.Function(
+            self, "MyAuroraLambdaFunction",
+            runtime=_lambda.Runtime.PYTHON_3_8,
+            handler="lambda_function.handler",
+            code=_lambda.Code.from_asset("D://Documents/pythonProject/aws/my_proj/lambda_fun/fun_aurora/"),
+            environment={
+                'DATABASE_ENDPOINT': cluster.cluster_endpoint.hostname,
+                'DATABASE_NAME': database_name,
+                'DATABASE_SECRET_ARN': db_secret.secret_arn  # 使用 Secrets Manager 中的 ARN
+            }
+        )
+
+        # 将 Lambda 函数的执行角色授权给 Amazon Aurora 数据库
+        # cluster.grant_data_api_access(
+        #     db_name=database_name,
+        #     grantee=aurora_lambda.role
+        # )
+
+        # 添加 Lambda 执行角色的 IAM 权限，以允许访问 Secrets Manager 中的数据库凭据
+        db_secret.grant_read(aurora_lambda)
+
+        # 添加 Lambda 执行角色权限
+        aurora_lambda.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue", "rds-data:ExecuteStatement"],
+                resources=[db_secret.secret_arn]  # 允许 Lambda 访问 Secrets Manager 中的特定 secret
+            )
+        )
+
+        return aurora_lambda
+
+    def s3_data_ops(self):
         # 创建 S3 存储桶
         bucket = s3.Bucket(
             self, "mybucket-cdk",
             removal_policy=core.RemovalPolicy.DESTROY
         )
 
-        lambda_function = self.create_lambda()
+        s3_lambda_function = self.create_s3_lambda()
 
         # 添加 Lambda 函数的 IAM 权限
-        bucket.grant_write(lambda_function)
+        bucket.grant_write(s3_lambda_function)
 
         # 将 Lambda 函数绑定到事件源，以便在容器完成后触发
         rule = events.Rule(
-            self, "MyRule",
+            self, "MyS3Rule",
             event_pattern={
                 "source": ["aws.ecs"],
-                "detail-type": ["ECS Task State Change"],
+                "detail": {
+                    "lastStatus": ["STOPPED"]
+                }
+            }
+        )
+        rule.add_target(targets.LambdaFunction(s3_lambda_function))
+
+    def aurora_data_ops(self):
+        # 创建 Amazon Aurora 数据库
+        cluster = rds.DatabaseCluster(
+            self, "AuroraCluster",
+            engine=rds.DatabaseClusterEngine.aurora(
+                version=rds.AuroraEngineVersion.VER_1_19_0
+            ),
+            instance_props={
+                "instance_type": ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+                "vpc_subnets": {
+                    "subnet_type": ec2.SubnetType.PRIVATE_WITH_EGRESS
+                },
+                "vpc": self.vpc
+            },
+            parameter_group=rds.ParameterGroup.from_parameter_group_name(
+                self, "ParameterGroup",
+                parameter_group_name="default.aurora-mysql5.7"
+            )
+        )
+
+        # 创建 Lambda 函数
+        lambda_function = self.create_aurora_writer_lambda(cluster)
+
+        # 创建 Lambda 函数的触发器，使其能够响应特定事件并将数据写入数据库
+        rule = events.Rule(
+            self, "MyAuroraRule",
+            event_pattern={
+                "source": ["aws.ecs"],
                 "detail": {
                     "lastStatus": ["STOPPED"]
                 }
