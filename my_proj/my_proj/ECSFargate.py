@@ -4,9 +4,11 @@ from aws_cdk import (
     aws_ecr as ecr,
     aws_elasticloadbalancingv2 as elbv2,
     aws_logs as logs,
-    # aws_iam as iam,
-    # aws_autoscaling as autoscaling,
-    # aws_fargate as fargate
+    aws_s3 as s3,
+    aws_lambda as _lambda,
+    aws_events as events,
+    aws_events_targets as targets,
+    aws_iam as iam
 )
 import aws_cdk as core
 from constructs import Construct
@@ -41,19 +43,6 @@ class EcsFargateStack(core.Stack):
             destination_cidr_block="0.0.0.0/0",
             nat_gateway_id=nat_gateway.ref
         )
-        # # 创建默认路由
-        # route_table.add_route(
-        #     "DefaultRouteToNat",
-        #     router_type=ec2.RouterType.NAT_GATEWAY,
-        #     router_id=nat_gateway.ref,
-        #     destination_cidr_block="0.0.0.0/0"
-        # )
-
-        # 创建 ECR 存储库
-        ecr_repository = ecr.Repository(
-            self, "MyECRRepository",
-            removal_policy=core.RemovalPolicy.DESTROY
-        )
 
         # 定义 ECS 集群
         cluster = ecs.Cluster(
@@ -61,45 +50,27 @@ class EcsFargateStack(core.Stack):
             vpc=self.vpc
         )
 
-        # 创建 ECS Task Definition
         task_definition = ecs.FargateTaskDefinition(
-            self, "MyTaskDefinition",
+            self, "taskDefinition"
         )
-
-        # 添加容器到 Task Definition
-        container = task_definition.add_container(
-            "MyContainer",
-            image=ecs.ContainerImage.from_ecr_repository(ecr_repository),
-            memory_limit_mib=256,
-            cpu=256,
-            logging=ecs.AwsLogDriver(
-                stream_prefix="MyContainer",
-                log_group=logs.LogGroup(
-                    self, "MyLogGroup",
-                    log_group_name="MyLogGroup",
-                    removal_policy=core.RemovalPolicy.DESTROY
-                )
-            )
-        )
-        # 明确指定容器的端口映射
-        container.add_port_mappings(
-            ecs.PortMapping(container_port=80)
-        )
+        for i in range(3):
+            task_definition = self.get_image_to_task_container(task_definition, 'MyRepo' + str(i+1), "lastest", 'MyContainer' + str(i+1), 'MyLogGroup' + str(i+1))
 
         # 创建 ECS Service
         service = ecs.FargateService(
             self, "MyFargateService",
             cluster=cluster,
             task_definition=task_definition,
-            desired_count=1,
+            desired_count=1, # 1个任务实例
             assign_public_ip=False,  # 不分配公有 IP，私有子网
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[self.create_fargate_SG()]
         )
 
         # 添加 AutoScaling
         scaling = service.auto_scale_task_count(
-            min_capacity=1,
-            max_capacity=2
+            min_capacity=3,
+            max_capacity=5
         )
 
         # 创建 Application Load Balancer
@@ -124,6 +95,8 @@ class EcsFargateStack(core.Stack):
             open=True,
             default_target_groups=[target_group]
         )
+
+        self.dataOps()
 
         # 输出 ALB DNS 名称
         output = core.CfnOutput(
@@ -154,3 +127,79 @@ class EcsFargateStack(core.Stack):
             nat_gateways=1
         )
         return vpc
+
+    def get_image_to_task_container(self, task_def, repo_name, tag_name, container_name, log_group_name):
+        ecr_repo = ecr.Repository(
+            self, repo_name
+        )
+        container = task_def.add_container(
+            container_name,
+            image=ecs.ContainerImage.from_ecr_repository(ecr_repo, tag_name),
+            memory_limit_mib=512,
+            logging=ecs.AwsLogDriver(
+                stream_prefix=container_name,
+                log_group=logs.LogGroup(self, log_group_name,
+                                        log_group_name=log_group_name,
+                                        removal_policy=core.RemovalPolicy.DESTROY)
+            )
+        )
+
+        container.add_port_mappings(
+            ecs.PortMapping(container_port=80)
+        )
+        return task_def
+
+    def create_fargate_SG(self):
+        sg = ec2.SecurityGroup(self, id="fargateSG", vpc=self.vpc, allow_all_outbound=False, description="fargate service Security Group")
+        sg.add_ingress_rule(peer=ec2.Peer.ipv4(VPC_CIDR), connection=ec2.Port.tcp(80), description="HTTP ingress")
+        sg.add_ingress_rule(peer=ec2.Peer.ipv4(VPC_CIDR), connection=ec2.Port.tcp(443), description="HTTPS ingress")
+        sg.add_egress_rule(peer=ec2.Peer.ipv4("0.0.0.0/0"), connection=ec2.Port.tcp(80), description="HTTP egress")
+        sg.add_egress_rule(peer=ec2.Peer.ipv4("0.0.0.0/0"), connection=ec2.Port.tcp(443), description="HTTPS egress")
+        return sg
+
+    def create_lambda(self):
+        # 创建 Lambda 函数
+        lambda_fn = _lambda.Function(
+            self, "MyLambdaFunction",
+            runtime=_lambda.Runtime.PYTHON_3_8,
+            handler="lambda_function.handler",
+            code=_lambda.Code.from_asset("d://Documents/pythonProject/aws/my_proj/lambda_fun/lambda_s3.py"),  # 指定 Lambda 函数代码路径
+            environment={
+                'BUCKET_NAME': 'mybucket-cdk'  # 设置环境变量，替换为您的 S3 存储桶名称
+            }
+        )
+
+        # 添加 Lambda 执行角色权限
+        lambda_fn.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=["s3:PutObject"],
+                resources=["arn:aws:s3:::mybucket-cdk/*"]  # 替换为您的 S3 存储桶 ARN
+            )
+        )
+
+        return lambda_fn
+
+    def dataOps(self):
+        # 创建 S3 存储桶
+        bucket = s3.Bucket(
+            self, "mybucket-cdk",
+            removal_policy=core.RemovalPolicy.DESTROY
+        )
+
+        lambda_function = self.create_lambda()
+
+        # 添加 Lambda 函数的 IAM 权限
+        bucket.grant_write(lambda_function)
+
+        # 将 Lambda 函数绑定到事件源，以便在容器完成后触发
+        rule = events.Rule(
+            self, "MyRule",
+            event_pattern={
+                "source": ["aws.ecs"],
+                "detail-type": ["ECS Task State Change"],
+                "detail": {
+                    "lastStatus": ["STOPPED"]
+                }
+            }
+        )
+        rule.add_target(targets.LambdaFunction(lambda_function))
