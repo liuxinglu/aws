@@ -16,9 +16,8 @@ import aws_cdk as core
 from constructs import Construct
 
 VPC_CIDR = "172.32.0.0/16"
-SUBNET_SIZE = 26
+SUBNET_SIZE = 24
 SUBNET_CIDRS = ['172.32.1.0/24', '172.32.2.0/24']
-AV_ZONES = ['ap-southeast-2a', 'ap-southeast-2b']
 
 class EcsFargateStack(core.Stack):
 
@@ -27,7 +26,18 @@ class EcsFargateStack(core.Stack):
 
         # 创建 VPC 和子网
         self.vpc = self.create_VPC()
-
+        # self.subnet_lst = []
+        # # 创建两个私有子网，分别代表两个不同的可用区
+        # for i in range(len(SUBNET_CIDRS)):
+        #     self.subnet_lst.append(ec2.Subnet(
+        #         self,
+        #         "Subnet" + str(i+1),
+        #         vpc_id=self.vpc.vpc_id,
+        #         availability_zone=core.Fn.select(i, core.Fn.get_azs()),
+        #         cidr_block=SUBNET_CIDRS[i],
+        #         map_public_ip_on_launch = False,
+        #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        #     ))
         # 创建 NAT Gateway
         nat_gateway = ec2.CfnNatGateway(
             self, "MyNatGateway",
@@ -56,16 +66,21 @@ class EcsFargateStack(core.Stack):
             self, "taskDefinition"
         )
         for i in range(3):
-            task_definition = self.get_image_to_task_container(task_definition, 'MyRepo' + str(i+1), "lastest", 'MyContainer' + str(i+1), 'MyLogGroup' + str(i+1))
+            task_definition = self.get_image_to_task_container(task_definition,
+                                                               'MyRepo' + str(i+1),
+                                                               "lastest",
+                                                               'MyContainer' + str(i+1),
+                                                               'MyLogGroup' + str(i+1),
+                                                               80+i)
 
         # 创建 ECS Service
         service = ecs.FargateService(
             self, "MyFargateService",
             cluster=cluster,
             task_definition=task_definition,
-            desired_count=1, # 1个任务实例
+            desired_count=3, # 1个任务实例
             assign_public_ip=False,  # 不分配公有 IP，私有子网
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            vpc_subnets=ec2.SubnetSelection(subnets=self.vpc.private_subnets), # subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[self.create_fargate_SG()]
         )
 
@@ -87,7 +102,9 @@ class EcsFargateStack(core.Stack):
             self, "MyTargetGroup",
             vpc=self.vpc,
             port=80,
-            targets=[service]
+            targets=[
+                service.load_balancer_target(container_name=f"MyContainer{i+1}", container_port=80+i) for i in range(3)
+            ]
         )
 
         # 添加 Listener，并将 Target Group 关联
@@ -120,22 +137,26 @@ class EcsFargateStack(core.Stack):
                     cidr_mask=SUBNET_SIZE,
                 ),
                 ec2.SubnetConfiguration(
-                    name="Private-Subnet-1",
+                    name='Private-Subnet1',
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
                     cidr_mask=SUBNET_SIZE,
                 ),
                 ec2.SubnetConfiguration(
-                    name="Private-Subnet-2",
+                    name='Private-Subnet2',
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=SUBNET_SIZE,
+                ),
+                ec2.SubnetConfiguration(
+                    name='Private-Subnet3',
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
                     cidr_mask=SUBNET_SIZE,
                 ),
             ],
-            availability_zones = [AV_ZONES[0]],
             nat_gateways=1
         )
         return vpc
 
-    def get_image_to_task_container(self, task_def, repo_name, tag_name, container_name, log_group_name):
+    def get_image_to_task_container(self, task_def, repo_name, tag_name, container_name, log_group_name, port):
         ecr_repo = ecr.Repository(
             self, repo_name
         )
@@ -145,15 +166,14 @@ class EcsFargateStack(core.Stack):
             memory_limit_mib=512,
             logging=ecs.AwsLogDriver(
                 stream_prefix=container_name,
-                log_group=logs.LogGroup(self, log_group_name,
+                log_group=logs.LogGroup(self,
+                                        log_group_name,
                                         log_group_name=log_group_name,
                                         removal_policy=core.RemovalPolicy.DESTROY)
             )
         )
 
-        container.add_port_mappings(
-            ecs.PortMapping(container_port=80)
-        )
+        container.add_port_mappings(ecs.PortMapping(container_port=port))
         return task_def
 
     def create_fargate_SG(self):
@@ -268,8 +288,8 @@ class EcsFargateStack(core.Stack):
         # 创建 Amazon Aurora 数据库
         cluster = rds.DatabaseCluster(
             self, "AuroraCluster",
-            engine=rds.DatabaseClusterEngine.aurora(
-                version=rds.AuroraEngineVersion.VER_1_19_0
+            engine=rds.DatabaseClusterEngine.aurora_mysql(
+                version=rds.AuroraMysqlEngineVersion.VER_2_11_2
             ),
             instance_props={
                 "instance_type": ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
