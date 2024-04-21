@@ -26,7 +26,7 @@ class EcsFargateStack(core.Stack):
 
         # 创建 VPC 和子网
         self.vpc = self.create_VPC()
-        
+
         # self.subnet_lst = []
         # # 创建两个私有子网，分别代表两个不同的可用区
         # for i in range(len(SUBNET_CIDRS)):
