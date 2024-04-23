@@ -242,13 +242,6 @@ class EcsFargateStack(core.Stack):
             }
         )
 
-        # 将 Lambda 函数的执行角色授权给 Amazon Aurora 数据库
-        # cluster.grant_data_api_access(
-        #     db_name=database_name,
-        #     grantee=aurora_lambda.role
-        # )
-
-        # 添加 Lambda 执行角色的 IAM 权限，以允许访问 Secrets Manager 中的数据库凭据
         db_secret.grant_read(aurora_lambda)
 
         # 添加 Lambda 执行角色权限

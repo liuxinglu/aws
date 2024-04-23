@@ -4,11 +4,11 @@ import os
 import aws_cdk as cdk
 
 # from my_proj.my_proj_stack import MyProjStack
-from my_proj.ECSFargate import EcsFargateStack
+from my_proj.EKSWithECRStack import EksWithEcrStack
 
 
 app = cdk.App()
-EcsFargateStack(app, "EcsFargateStack")
+EksWithEcrStack(app, "EcsFargateStack")
 # MyProjStack(app, "MyProjStack",
 #     # If you don't specify 'env', this stack will be environment-agnostic.
 #     # Account/Region-dependent features and context lookups will not work,
