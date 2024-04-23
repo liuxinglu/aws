@@ -12,6 +12,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_rds as rds,
     aws_cloudwatch as cloudwatch,
+    aws_wafv2 as wafv2
 )
 
 import aws_cdk as core
@@ -32,30 +33,35 @@ class EksWithEcrStack(core.Stack):
                     subnet_type=ec2.SubnetType.PUBLIC,
                 ),
                 ec2.SubnetConfiguration(
-                    name="PrivateSubnet",
+                    name="PrivateSubnet1",
                     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                ),
+                ec2.SubnetConfiguration(
+                    name="PrivateSubnet2",
+                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
                 ),
             ]
         )
 
         # 创建 ECR 存储库
-        ecr_repository_names = ["redis", "httpd", "email"]
+        ecr_repository_names = ["redis_name", "httpd_name", "email_name"]
         ecr_repositories = {}
         for repo_name in ecr_repository_names:
             ecr_repositories[repo_name] = ecr.Repository(self, f"{repo_name}Repository")
 
         # 创建 EKS 集群
         cluster = eks.Cluster(self, "MyCluster",
-            vpc=vpc,
-            default_capacity=0
-        )
+                              vpc=vpc,
+                              default_capacity=0,
+                              version=eks.KubernetesVersion.V1_23
+                              )
 
         # 为 Fargate 添加 IAM 角色权限
-        cluster.add_to_principal_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "logs:CreateLogStream", "logs:PutLogEvents"],
-            resources=["*"]
-        ))
+        # cluster.add_to_principal_policy(iam.PolicyStatement(
+        #     effect=iam.Effect.ALLOW,
+        #     actions=["ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "logs:CreateLogStream", "logs:PutLogEvents"],
+        #     resources=["*"]
+        # ))
 
         # 创建 Fargate Profile
         for repo_name, ecr_repo in ecr_repositories.items():
@@ -67,24 +73,37 @@ class EksWithEcrStack(core.Stack):
             )
 
         # 创建 Application Load Balancer
-        alb = ecs_patterns.ApplicationLoadBalancedFargateService(self, "MyFargateService",
-            cluster=cluster,
-            task_image_options=[
-                ecs_patterns.ApplicationLoadBalancedTaskImageOptions(image=ecs.ContainerImage.from_ecr_repository(ecr_repositories["redis"]), container_port=6379),
-                ecs_patterns.ApplicationLoadBalancedTaskImageOptions(image=ecs.ContainerImage.from_ecr_repository(ecr_repositories["httpd"]), container_port=80),
-                ecs_patterns.ApplicationLoadBalancedTaskImageOptions(image=ecs.ContainerImage.from_ecr_repository(ecr_repositories["email"]), container_port=80),
-            ],
-            public_load_balancer=True,
-            desired_count=1,
+        self.deployToFargate(1, cluster, ecr_repositories["redis_name"], 6379)
+        self.deployToFargate(2, cluster, ecr_repositories["httpd_name"], 80)
+        self.deployToFargate(3, cluster, ecr_repositories["email_name"], 80)
+
+        self.s3_data_ops()
+        self.aurora_data_ops(vpc)
+        # 监控 Fargate 服务的 CPU 和内存利用率
+        self.add_cloudwatch_metrics()
+
+
+    def deployToFargate(self, index, cluster, repo, container_port):
+        image_options = ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
+            image=ecs.ContainerImage.from_ecr_repository(repo),
+            container_port=container_port
         )
 
+        alb = ecs_patterns.ApplicationLoadBalancedFargateService(self, "MyFargateService"+str(index),
+                                                                 cluster=cluster,
+                                                                 task_image_options=image_options,
+                                                                 public_load_balancer=True,
+                                                                 desired_count=1,
+                                                                 )
         # 创建 AutoScaling Group
         scaling = alb.service.auto_scale_task_count(max_capacity=10)
         scaling.scale_on_cpu_utilization("CpuScaling", target_utilization_percent=50)
-        self.s3_data_ops()
-        self.aurora_data_ops()
-        # 监控 Fargate 服务的 CPU 和内存利用率
-        self.add_cloudwatch_metrics()
+
+        self.add_waf(index, alb)
+        core.CfnOutput(
+            self, "MyALBDNS" + str(index),
+            value=alb.load_balancer.load_balancer_dns_name
+        )
 
     def create_s3_lambda(self):
         # 创建 Lambda 函数
@@ -118,17 +137,6 @@ class EksWithEcrStack(core.Stack):
 
         # 数据库表
         database_name = "my_database"
-
-        # database_credentials = secretsmanager.Secret(
-        #     self, "DatabaseCredentials",
-        #     generate_secret_string=secretsmanager.SecretStringGenerator(
-        #         secret_string_template='{"username": "admin"}',
-        #         generate_string_key='password',
-        #         exclude_punctuation=True
-        #     )
-        # )
-
-        # database_credentials.grant_read_write(cluster.secret.secret_arn)
 
         # 创建 Lambda 函数
         aurora_lambda = _lambda.Function(
@@ -179,7 +187,7 @@ class EksWithEcrStack(core.Stack):
         )
         rule.add_target(targets.LambdaFunction(s3_lambda_function))
 
-    def aurora_data_ops(self):
+    def aurora_data_ops(self, vpc):
         # 创建 Amazon Aurora 数据库
         cluster = rds.DatabaseCluster(
             self, "AuroraCluster",
@@ -191,7 +199,7 @@ class EksWithEcrStack(core.Stack):
                 "vpc_subnets": {
                     "subnet_type": ec2.SubnetType.PRIVATE_ISOLATED
                 },
-                "vpc": self.vpc
+                "vpc": vpc
             },
             parameter_group=rds.ParameterGroup.from_parameter_group_name(
                 self, "ParameterGroup",
@@ -219,18 +227,13 @@ class EksWithEcrStack(core.Stack):
         cpu_metric = cloudwatch.Metric(
             namespace="AWS/ECS",
             metric_name="CPUUtilization",
-            dimensions={
-                "ClusterName": "MyCluster",  # 更改为您的集群名称
-                "ServiceName": "MyFargateService"  # 更改为您的服务名称
-            },
             statistic="Average",
             period=core.Duration.minutes(5)
         )
 
         # 创建 CloudWatch 报警以监控 CPU 利用率
-        cpu_alarm = cloudwatch.Alarm(
+        cpu_alarm = cpu_metric.create_alarm(
             self, "FargateCPUAlarm",
-            metric=cpu_metric,
             threshold=80,  # CPU 利用率阈值（此处为 80%）
             evaluation_periods=1,
             alarm_name="FargateCPUAlarm",
@@ -244,18 +247,13 @@ class EksWithEcrStack(core.Stack):
         memory_metric = cloudwatch.Metric(
             namespace="AWS/ECS",
             metric_name="MemoryUtilization",
-            dimensions={
-                "ClusterName": "MyCluster",  # 更改为您的集群名称
-                "ServiceName": "MyFargateService"  # 更改为您的服务名称
-            },
             statistic="Average",
             period=core.Duration.minutes(5)
         )
 
         # 创建 CloudWatch 报警以监控内存利用率
-        memory_alarm = cloudwatch.Alarm(
+        memory_alarm = memory_metric.create_alarm(
             self, "FargateMemoryAlarm",
-            metric=memory_metric,
             threshold=80,  # 内存利用率阈值（此处为 80%）
             evaluation_periods=1,
             alarm_name="FargateMemoryAlarm",
@@ -263,4 +261,36 @@ class EksWithEcrStack(core.Stack):
             actions_enabled=True,
             alarm_description="Alarm when Fargate memory exceeds 80%",
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING  # 在缺失数据时不触发报警
+        )
+
+    def add_waf(self, index, alb):
+        # 创建 Web ACL
+        web_acl = wafv2.CfnWebACL(
+            self, "MyWebACL" + str(index),
+            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
+            scope="REGIONAL",  # 选择作用域，REGIONAL 或 CLOUDFRONT
+            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,  # 启用 CloudWatch 指标
+                sampled_requests_enabled=True,
+                metric_name="MyWebACLMetric"  # 自定义指标名称
+            )
+        )
+
+        # 创建 WAF 规则
+        waf_rule = wafv2.CfnRuleGroup(
+            self, "MyWAFRuleGroup" + str(index),
+            capacity=1,  # 规则组容量
+            scope="REGIONAL",  # 选择作用域，REGIONAL 或 CLOUDFRONT
+            visibility_config=wafv2.CfnRuleGroup.VisibilityConfigProperty(
+                sampled_requests_enabled=True,  # 启用采样请求
+                cloud_watch_metrics_enabled=True,  # 启用 CloudWatch 指标
+                metric_name="MyWAFRuleGroupMetric"  # 自定义指标名称
+            )
+        )
+
+        # 关联 Web ACL 和 WAF 规则
+        wafv2.CfnWebACLAssociation(
+            self, "MyWebACLAssociation" + str(index),
+            resource_arn=alb.load_balancer.load_balancer_arn,  # ALB 的 ARN
+            web_acl_arn=web_acl.attr_arn
         )
